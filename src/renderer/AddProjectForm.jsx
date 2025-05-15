@@ -1,14 +1,23 @@
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const AddProjectForm = () => {
+  const location = useLocation();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    project: "",
-    modeler: "",
-    java: "",
-    nativeTemplate: "",
+  const [formData, setFormData] = useState(
+    location.state || {
+      project: "",
+      modeler: "",
+      java: "",
+      nativeTemplate: "",
+    }
+  );
+  const [errors, setErrors] = useState({
+    project: false,
+    modeler: false,
+    java: false,
+    nativeTemplate: false,
   });
 
   const { mutate: saveProject } = useMutation({
@@ -18,7 +27,10 @@ const AddProjectForm = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
+    },
+    onSuccess: () => {
       refetch();
+      navigate("/");
     },
   });
 
@@ -36,32 +48,66 @@ const AddProjectForm = () => {
 
   return (
     <div className="">
-      <button onClick={() => navigate("/")}>close</button>
-      <div>
+      <div
+        onClick={() => handlePathChange("project")}
+        className={`location-input ${errors.project ? "invalid" : ""}`}
+      >
+        <button>Select Project Path</button>
         <p>{formData.project || "Empty"} </p>
-        <button onClick={() => handlePathChange("project")}>
-          Select Project Path
-        </button>
       </div>
-      <div>
+      <div
+        onClick={() => handlePathChange("modeler")}
+        className={`location-input ${errors.project ? "invalid" : ""}`}
+      >
+        <button>Select modeler Path</button>
         <p>{formData.modeler || "Empty"}</p>
-        <button onClick={() => handlePathChange("modeler")}>
-          Select modeler Path
-        </button>
       </div>
-      <div>
+      <div
+        onClick={() => handlePathChange("java")}
+        className={`location-input ${errors.project ? "invalid" : ""}`}
+      >
+        <button>Select Java Path</button>
         <p>{formData.java || "Empty"}</p>
-        <button onClick={() => handlePathChange("java")}>
-          Select Java Path
-        </button>
       </div>
-      <div>
+      <div
+        onClick={() => handlePathChange("nativeTemplate")}
+        className={`location-input ${errors.project ? "invalid" : ""}`}
+      >
+        <button>Native Template Path</button>
         <p>{formData.nativeTemplate || "Empty"}</p>
-        <button onClick={() => handlePathChange("nativeTemplate")}>
-          Native Template Path
+      </div>
+      <div className="form-footer-actions">
+        <button onClick={() => navigate("/")} className="action-button">
+          Back
+        </button>
+        <button
+          onClick={() => {
+            const errors = Object.keys(formData).reduce((prev, curr) => {
+              const value = formData[curr];
+              const prevObje =
+                typeof prev === "object"
+                  ? prev
+                  : {
+                      [prev]: !formData[prev],
+                    };
+              return {
+                ...prevObje,
+                [curr]: !value,
+              };
+            });
+
+            let valid = Object.values(errors).some((value) => !value);
+            if (valid) {
+              saveProject();
+            } else {
+              setErrors(errors);
+            }
+          }}
+          className="build-btn"
+        >
+          Save
         </button>
       </div>
-      <button onClick={() => saveProject()}>save</button>
     </div>
   );
 };

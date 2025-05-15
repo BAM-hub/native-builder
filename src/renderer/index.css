@@ -1,3 +1,9 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
@@ -13,10 +19,111 @@ body {
   padding: 2rem;
   transition: all 300ms ease;
   border-radius: 0.2rem;
+  position: relative;
+}
+
+.project::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 2%;
+  right: 2%;
+  height: 1px;
+  background-color: black;
 }
 
 .project:hover {
+  /* background-color: aliceblue; */
+}
+
+.remove-button,
+.action-button,
+.build-btn {
+  border: 0;
+  border-radius: 2rem;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  transition: all 300ms ease;
+}
+
+.action-button:hover {
   background-color: aliceblue;
+}
+
+.me-1 {
+  margin-inline-end: 1rem;
+}
+
+.action-button.hidden {
+  width: 0px;
+  padding: 0;
+  pointer-events: none;
+  user-select: none;
+  color: transparent;
+  position: relative;
+}
+
+.remove-button {
+  background-color: #da3503;
+  color: white;
+}
+
+.remove-button:hover {
+  background-color: #f6410b;
+}
+
+.action-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.location-input {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  margin-block: 1rem;
+  cursor: pointer;
+}
+
+.location-input.invalid button,
+.location-input.invalid p {
+  border-color: red;
+}
+
+.location-input button {
+  cursor: pointer;
+  border: none;
+  border-top-left-radius: 1rem;
+  border-bottom-left-radius: 1rem;
+  padding: 1rem;
+  border: 1px solid rgb(185, 185, 185);
+  transition: 300ms background-color ease;
+}
+
+.location-input:hover p,
+.location-input:hover button {
+  background-color: rgb(232, 231, 231);
+}
+
+.location-input p {
+  transition: 300ms background-color ease;
+  border: 1px solid rgb(185, 185, 185);
+  border-left: 0;
+  padding: 1rem;
+  padding-inline-start: 1rem;
+  border-top-right-radius: 1rem;
+  border-bottom-right-radius: 1rem;
+}
+
+.form-footer-actions,
+.cta-contaienr {
+  /* margin-block: 1rem; */
+  padding: 1.5rem;
+  padding-bottom: 1rem;
+  display: flex;
+  gap: 2rem;
+  justify-content: space-between;
 }
 
 .build-btn {
@@ -27,14 +134,19 @@ body {
   transition: background-color 300ms ease;
 }
 
+.build-disabled {
+  background-color: rgb(75, 74, 74);
+  cursor: auto;
+}
+
 .build-btn:hover {
   cursor: pointer;
-  background-color: rgb(14, 13, 13);
+  background-color: rgb(70, 69, 69);
 }
 
 .loader {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   border: 3px solid #fff;
   border-radius: 50%;
   display: inline-block;
@@ -49,8 +161,8 @@ body {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 3px solid transparent;
   border-bottom-color: #ff3d00;
