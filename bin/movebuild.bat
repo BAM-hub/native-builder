@@ -32,6 +32,10 @@ mkdir "%NATIVE_TEMPLATE%\tempios"
 tar -xf "%NATIVE_TEMPLATE%\%ANDROID_FILE%" -C "%NATIVE_TEMPLATE%\tempandroid"
 tar -xf "%NATIVE_TEMPLATE%\%IOS_FILE%" -C "%NATIVE_TEMPLATE%\tempios"
 
+rm "%NATIVE_TEMPLATE%\%ANDROID_FILE%"
+rm "%NATIVE_TEMPLATE%\%ANDROID_FILE%"
+
+
 :: Move extracted bundles
 move /Y "%NATIVE_TEMPLATE%\tempandroid\assets\index.android.bundle" "%NATIVE_TEMPLATE%\android\app\src\main\assets"
 move /Y "%NATIVE_TEMPLATE%\tempios\index.ios.bundle" "%NATIVE_TEMPLATE%\ios\Bundle"
@@ -39,5 +43,20 @@ move /Y "%NATIVE_TEMPLATE%\tempios\index.ios.bundle" "%NATIVE_TEMPLATE%\ios\Bund
 :: Cleanup temp folders
 rmdir /S /Q "%NATIVE_TEMPLATE%\tempandroid"
 rmdir /S /Q "%NATIVE_TEMPLATE%\tempios"
+
+cd /d "%NATIVE_TEMPLATE%"
+
+echo 🔧 Adding Android bundle
+git add ".\android\app\src\main\assets\index.android.bundle"
+
+echo 🔧 Adding iOS bundle
+git add ".\ios\Bundle\index.ios.bundle"
+
+
+echo 📝 Committing changes
+git commit -m "Create New bundle"
+
+echo 🚀 Pushing to remote
+git push
 
 endlocal
