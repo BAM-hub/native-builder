@@ -1,11 +1,8 @@
 import { exec, spawn } from "child_process";
 import { app, dialog } from "electron";
-import EventEmitter from "node:events";
 import express from "express";
 import fs from "fs";
 import path from "path";
-
-// const eventemitter = new EventEmitter();
 
 const META_PATH = path.join(app.getPath("userData"), "meta.json");
 console.log(META_PATH);
@@ -54,6 +51,7 @@ function getJavaInfo(callback) {
 }
 
 export function createServer() {
+  let childProcess = null;
   const api = express();
   api.use(express.json());
   api.use((req, res, next) => {
@@ -90,9 +88,38 @@ export function createServer() {
 
   api.post("/api/save-project", async (req, res) => {
     const { project, modeler, java, nativeTemplate } = req.body;
+    if (!project)
+      return res.status(400).send({ message: "project is required" });
+    if (!modeler)
+      return res.status(400).send({ message: "modeler is required" });
+    if (!java) return res.status(400).send({ message: "java is required" });
+    if (!nativeTemplate)
+      return res.status(400).send({ message: "nativeTemplate is required" });
+
     const meta = [{ project, modeler, java, nativeTemplate }];
 
     const prevMetaJson = getMeta();
+    const projectExists =
+      prevMetaJson?.filter((prevProject) => prevProject.project === project)
+        .length > 0;
+
+    if (projectExists) {
+      fs.writeFile(
+        META_PATH,
+        JSON.stringify(
+          prevMetaJson.map((prevProject) => {
+            if (prevProject.project === project) {
+              return { project, modeler, java, nativeTemplate };
+            }
+            return prevProject;
+          })
+        ),
+        () => {
+          res.send({ message: "Success" });
+        }
+      );
+      return;
+    }
 
     try {
       fs.writeFile(
@@ -102,6 +129,21 @@ export function createServer() {
           return res.send({ message: "Success" });
         }
       );
+    } catch {
+      return res.status(500).send({ message: "somthing went wrong" });
+    }
+  });
+
+  api.delete("/api/project", (req, res) => {
+    const { project } = req.body;
+    const prevMetaJson = getMeta();
+    const meta = prevMetaJson?.filter(
+      (prevProject) => prevProject.project !== project
+    );
+    try {
+      fs.writeFile(META_PATH, JSON.stringify(meta), () => {
+        return res.send({ message: "Success" });
+      });
     } catch {
       return res.status(500).send({ message: "somthing went wrong" });
     }
@@ -125,7 +167,6 @@ export function createServer() {
 
   api.post("/api/create-build", (req, res) => {
     const { project, modeler, java, nativeTemplate } = req.body;
-
     const name = project.split("\\").at(-1);
 
     const buildCommand = [
@@ -138,30 +179,28 @@ export function createServer() {
       "--project-path",
       `"${project}\\Tajawob.mpr"`,
       "--java-home",
-      `"${java}"`, // Quotes around paths
+      `"${java}"`,
       "--mxbuild-path",
       `"${modeler}\\mxbuild.exe"`,
     ].join(" ");
 
     try {
-      const nativeBuilder = spawn(buildCommand, {
+      childProcess = spawn(buildCommand, {
         shell: true,
       });
-
-      // eventemitter.emit("start", nativeBuilder);
-      nativeBuilder.stdout.pipe(process.stdout);
-
-      nativeBuilder.stdout.on("data", (data) => {
+      // childProcess.kill();
+      childProcess.stdout.pipe(process.stdout);
+      childProcess.stdout.on("data", (data) => {
         console.log(`stdout: ${data}`);
       });
 
-      nativeBuilder.stderr.on("data", (data) => {
+      childProcess.stderr.on("data", (data) => {
         console.warn(`stdout data: ${data}`);
-
         // return res.json({ message: "success" });
       });
 
-      nativeBuilder.on("close", (code) => {
+      childProcess.on("close", (code) => {
+        if (code !== 0) return res.send({ message: "somthing went wrong" });
         console.warn(`child process exited with code ${code}`);
         const nativeTemplateFiles = fs.readdirSync(nativeTemplate);
 
@@ -172,24 +211,23 @@ export function createServer() {
           file.includes("iOS")
         )[0];
 
-        const bat = spawn("cmd.exe", [
+        const childProcess = spawn("cmd.exe", [
           "/c",
           scriptPath,
           `${nativeTemplate}`,
           `${androidFile}`,
           `${iosFile}`,
         ]);
-        // eventemitter.emit("start", nativeBuilder);
 
-        bat.stdout.on("data", (data) => {
+        childProcess.stdout.on("data", (data) => {
           console.log(`[stdout] ${data}`);
         });
 
-        bat.stderr.on("data", (data) => {
+        childProcess.stderr.on("data", (data) => {
           console.error(`[stderr] ${data}`);
         });
 
-        bat.on("close", (code) => {
+        childProcess.on("close", (code) => {
           if (code === 0) {
             fs.unlinkSync(path.join(nativeTemplate, androidFile));
             fs.unlinkSync(path.join(nativeTemplate, iosFile));
@@ -203,45 +241,19 @@ export function createServer() {
           }
         });
       });
-      // eventemitter.emit("end");
     } catch (err) {
       console.error(err);
-      // eventemitter.emit("end");
       return res.status(500).json({ message: "fail" });
     }
   });
 
-  // api.get("/api/read-stream", (req, res) => {
-  //   let localChildProcess = null;
-  //   res.set({
-  //     "Content-Type": "text/event-stream",
-  //     "Cache-Control": "no-cache",
-  //     Connection: "keep-alive",
-  //   });
-  //   eventemitter.on("start", (childProcess) => {
-  //     if (localChildProcess) {
-  //       localChildProcess.off("start");
-  //       bat.stdout.off("data");
-  //       bat.stderr.off("data");
-  //     }
-  //     localChildProcess = childProcess;
-  //     bat.stdout.on("data", (data) => {
-  //       console.log(`[stdout] ${data}`);
-  //       res.write(`${data.toString().replace(/\r?\n/g, "\ndata: ")}\n\n`);
-  //     });
-
-  //     bat.stderr.on("data", (data) => {
-  //       res.write(`${data.toString().replace(/\r?\n/g, "\ndata: ")}\n\n`);
-  //     });
-  //   });
-  //   eventemitter.on("end", () => {
-  //     localChildProcess.off("start");
-  //     bat.stdout.off("data");
-  //     bat.stderr.off("data");
-  //     eventemitter.off("end");
-  //     res.end();
-  //   });
-  // });
+  api.post("/api/stop-build", (req, res) => {
+    const killtask = spawn("taskkill", ["/PID", childProcess.pid, "/T", "/F"]);
+    killtask.on("close", (code) => {
+      if (code === 0) return res.send({ message: "sucess" });
+      return res.status(500).send({ message: "somthing went wrong" });
+    });
+  });
 
   api.listen(3000, () => {
     console.log("API server running on http://localhost:3000");
