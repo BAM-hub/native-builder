@@ -13,7 +13,10 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    resizable: false,
+    maximizable: false,
     webPreferences: {
+      devTools: !app.isPackaged,
       preload: path.join(__dirname, "preload.js"),
     },
   });
