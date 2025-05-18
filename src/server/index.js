@@ -9,8 +9,11 @@ const META_PATH = path.join(app.getPath("userData"), "meta.json");
 
 console.log(META_PATH);
 
-const BASE_PATH = app.isPackaged ? process.resourcesPath : __dirname;
-const exePath = path.join(BASE_PATH, "bin", "native-builder.exe");
+const BASE_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, "app", ".vite", "build", "bin")
+  : __dirname;
+
+const exePath = path.join(BASE_PATH, "native-builder.exe");
 const scriptPath = path.join(BASE_PATH, "bin", "movebuild.bat");
 
 function getMeta() {
@@ -87,6 +90,16 @@ export function createServer() {
 
     next();
   });
+
+  function clearTempFile() {
+    if (tempId)
+      fs.unlink(BASE_PATH + `${tempId}.txt`, (err) => {
+        if (err) {
+          console.error(err);
+        }
+        tempId = null;
+      });
+  }
 
   api.get("/api/pick", async (req, res) => {
     const result = await dialog.showOpenDialog({
@@ -206,7 +219,10 @@ export function createServer() {
       });
 
       stdListner(tempId, childProcess, (code) => {
-        if (code !== 0) return res.send({ message: "somthing went wrong" });
+        if (code !== 0) {
+          clearTempFile();
+          return res.send({ message: "somthing went wrong", code, exePath });
+        }
         console.warn(`child process exited with code ${code}`);
         const nativeTemplateFiles = fs.readdirSync(nativeTemplate);
 
@@ -233,9 +249,11 @@ export function createServer() {
             res.send({ message: "success" });
             console.log("✅ Batch script completed successfully.");
           } else {
-            res.send({ message: "fail" });
-
             console.error(`❌ Batch script exited with code ${code}`);
+            clearTempFile();
+            return res.status(500).send({
+              message: "somthing went wrong unpacking files",
+            });
           }
         });
       });
@@ -248,11 +266,7 @@ export function createServer() {
   api.post("/api/stop-build", (req, res) => {
     const killtask = spawn("taskkill", ["/PID", childProcess.pid, "/T", "/F"]);
 
-    fs.unlink(BASE_PATH + `${tempId}.txt`, (err) => {
-      if (err) {
-        console.error(err);
-      }
-    });
+    clearTempFile();
 
     killtask.on("close", (code) => {
       if (code === 0) return res.send({ message: "sucess" });
