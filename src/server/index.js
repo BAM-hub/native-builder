@@ -3,19 +3,15 @@ import { app, dialog } from "electron";
 import express from "express";
 import fs from "fs";
 import path from "path";
+import { createReadStream } from "tail-file-stream";
 
 const META_PATH = path.join(app.getPath("userData"), "meta.json");
+
 console.log(META_PATH);
-const exePath = path.join(
-  app.isPackaged ? process.resourcesPath : __dirname,
-  "bin",
-  "native-builder.exe"
-);
-const scriptPath = path.join(
-  app.isPackaged ? process.resourcesPath : __dirname,
-  "bin",
-  "movebuild.bat"
-);
+
+const BASE_PATH = app.isPackaged ? process.resourcesPath : __dirname;
+const exePath = path.join(BASE_PATH, "bin", "native-builder.exe");
+const scriptPath = path.join(BASE_PATH, "bin", "movebuild.bat");
 
 function getMeta() {
   try {
@@ -50,8 +46,27 @@ function getJavaInfo(callback) {
   });
 }
 
+function stdListner(id, childProcess, onClose) {
+  // childProcess.stdout.pipe(process.stdout);
+  childProcess.stdout.on("data", (data) => {
+    console.log(`stdout: ${data}`);
+    if (typeof listner === "function") listner(data, false);
+    fs.appendFile(BASE_PATH + `${id}.txt`, data, (err) => {
+      if (err) {
+        console.error("error", err);
+      }
+    });
+  });
+  childProcess.on("close", (...args) => {
+    if (typeof listner === "function") listner(null, true);
+
+    onClose(...args);
+  });
+}
+
 export function createServer() {
   let childProcess = null;
+  let tempId = null;
   const api = express();
   api.use(express.json());
   api.use((req, res, next) => {
@@ -166,6 +181,7 @@ export function createServer() {
   });
 
   api.post("/api/create-build", (req, res) => {
+    tempId = Math.random() * 10;
     const { project, modeler, java, nativeTemplate } = req.body;
     const name = project.split("\\").at(-1);
 
@@ -188,18 +204,8 @@ export function createServer() {
       childProcess = spawn(buildCommand, {
         shell: true,
       });
-      // childProcess.kill();
-      childProcess.stdout.pipe(process.stdout);
-      childProcess.stdout.on("data", (data) => {
-        console.log(`stdout: ${data}`);
-      });
 
-      childProcess.stderr.on("data", (data) => {
-        console.warn(`stdout data: ${data}`);
-        // return res.json({ message: "success" });
-      });
-
-      childProcess.on("close", (code) => {
+      stdListner(tempId, childProcess, (code) => {
         if (code !== 0) return res.send({ message: "somthing went wrong" });
         console.warn(`child process exited with code ${code}`);
         const nativeTemplateFiles = fs.readdirSync(nativeTemplate);
@@ -219,15 +225,7 @@ export function createServer() {
           `${iosFile}`,
         ]);
 
-        childProcess.stdout.on("data", (data) => {
-          console.log(`[stdout] ${data}`);
-        });
-
-        childProcess.stderr.on("data", (data) => {
-          console.error(`[stderr] ${data}`);
-        });
-
-        childProcess.on("close", (code) => {
+        stdListner(tempId, childProcess, (code) => {
           if (code === 0) {
             fs.unlinkSync(path.join(nativeTemplate, androidFile));
             fs.unlinkSync(path.join(nativeTemplate, iosFile));
@@ -249,9 +247,41 @@ export function createServer() {
 
   api.post("/api/stop-build", (req, res) => {
     const killtask = spawn("taskkill", ["/PID", childProcess.pid, "/T", "/F"]);
+
+    fs.unlink(BASE_PATH + `${tempId}.txt`, (err) => {
+      if (err) {
+        console.error(err);
+      }
+    });
+
     killtask.on("close", (code) => {
       if (code === 0) return res.send({ message: "sucess" });
       return res.status(500).send({ message: "somthing went wrong" });
+    });
+  });
+
+  api.get("/api/build-stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const readableStream = createReadStream(BASE_PATH + `${tempId}.txt`, {
+      start: 0,
+    });
+    readableStream.on("data", (data) => {
+      data
+        ?.toString()
+        ?.split("\n")
+        ?.forEach((log) => {
+          res.write("event: message\n");
+          res.write(`data: ${log} \n\n`);
+        });
+
+      res.write("event: message\n");
+      res.write(`data: ${data} \n\n`);
+    });
+    readableStream.on("end", (data) => {
+      res.end();
     });
   });
 
