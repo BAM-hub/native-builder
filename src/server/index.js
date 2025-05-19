@@ -189,9 +189,11 @@ export function createServer() {
   }
 
   api.get("/api/pick", async (req, res) => {
+    const type = req.query.type;
+    const properties = type === "file" ? ["openFile"] : ["openDirectory"];
     const result = await dialog.showOpenDialog({
       title: "Pick a file",
-      properties: ["openFile"],
+      properties,
       filters: [{ name: "All Files", extensions: ["*"] }],
     });
     if (result.canceled || result.filePaths.length === 0) {
@@ -202,7 +204,7 @@ export function createServer() {
   });
 
   api.post("/api/save-project", async (req, res) => {
-    const { project, modeler, java, nativeTemplate } = req.body;
+    const { project, modeler, java, nativeTemplate, id } = req.body;
     if (!project)
       return res.status(400).send({ message: "project is required" });
     if (!modeler)
@@ -211,20 +213,18 @@ export function createServer() {
     if (!nativeTemplate)
       return res.status(400).send({ message: "nativeTemplate is required" });
 
-    const meta = [{ project, modeler, java, nativeTemplate }];
+    const meta = [{ project, modeler, java, nativeTemplate, id }];
 
     const prevMetaJson = getMeta();
     const projectExists =
-      prevMetaJson?.filter((prevProject) => prevProject.project === project)
-        .length > 0;
-
+      prevMetaJson?.filter((prevProject) => prevProject.id === id).length > 0;
     if (projectExists) {
       fs.writeFile(
         META_PATH,
         JSON.stringify(
           prevMetaJson.map((prevProject) => {
-            if (prevProject.project === project) {
-              return { project, modeler, java, nativeTemplate };
+            if (prevProject.id === id) {
+              return { project, modeler, java, nativeTemplate, id };
             }
             return prevProject;
           })
@@ -250,11 +250,9 @@ export function createServer() {
   });
 
   api.delete("/api/project", (req, res) => {
-    const { project } = req.body;
+    const { id } = req.body;
     const prevMetaJson = getMeta();
-    const meta = prevMetaJson?.filter(
-      (prevProject) => prevProject.project !== project
-    );
+    const meta = prevMetaJson?.filter((prevProject) => prevProject.id !== id);
     try {
       fs.writeFile(META_PATH, JSON.stringify(meta), () => {
         return res.send({ message: "Success" });

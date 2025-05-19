@@ -33,12 +33,11 @@ export default function ProjectActions({
   });
 
   const { mutate: deleteProject } = useMutation({
-    mutationFn: async ({ project }) => {
-      console.log(project);
+    mutationFn: async ({ id }) => {
       return fetch("http://localhost:3000/api/project", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project }),
+        body: JSON.stringify({ id }),
       });
     },
     onSuccess: () => refetch(),
@@ -115,7 +114,7 @@ export default function ProjectActions({
             <button
               className="remove-button"
               onClick={() => {
-                deleteProject({ project: meta.project });
+                deleteProject({ id: meta.id });
               }}
             >
               Remove

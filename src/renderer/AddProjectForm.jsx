@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { nanoid } from "nanoid";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -7,6 +8,7 @@ const AddProjectForm = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState(
     location.state || {
+      id: nanoid(),
       project: "",
       modeler: "",
       java: "",
@@ -29,16 +31,15 @@ const AddProjectForm = () => {
       });
     },
     onSuccess: () => {
-      refetch();
       navigate("/");
+      refetch();
     },
   });
 
-  function handlePathChange(name) {
-    fetch("http://localhost:3000/api/pick")
+  function handlePathChange(name, type) {
+    fetch("http://localhost:3000/api/pick?type=" + type)
       .then((res) => res.json())
       .then((data) => {
-        console.log(data);
         setFormData({
           ...formData,
           [name]: data.filePath,
@@ -49,28 +50,28 @@ const AddProjectForm = () => {
   return (
     <div className="">
       <div
-        onClick={() => handlePathChange("project")}
+        onClick={() => handlePathChange("project", "file")}
         className={`location-input ${errors.project ? "invalid" : ""}`}
       >
         <button>Select Project Path</button>
         <p>{formData.project || "Empty"} </p>
       </div>
       <div
-        onClick={() => handlePathChange("modeler")}
+        onClick={() => handlePathChange("modeler", "folder")}
         className={`location-input ${errors.project ? "invalid" : ""}`}
       >
         <button>Select modeler Path</button>
         <p>{formData.modeler || "Empty"}</p>
       </div>
       <div
-        onClick={() => handlePathChange("java")}
+        onClick={() => handlePathChange("java", "folder")}
         className={`location-input ${errors.project ? "invalid" : ""}`}
       >
         <button>Select Java Path</button>
         <p>{formData.java || "Empty"}</p>
       </div>
       <div
-        onClick={() => handlePathChange("nativeTemplate")}
+        onClick={() => handlePathChange("nativeTemplate", "folder")}
         className={`location-input ${errors.project ? "invalid" : ""}`}
       >
         <button>Native Template Path</button>

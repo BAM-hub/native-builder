@@ -37,6 +37,7 @@
     "@tanstack/react-query": "^5.75.7",
     "electron-squirrel-startup": "^1.0.1",
     "express": "^5.1.0",
+    "nanoid": "^5.1.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.0",
