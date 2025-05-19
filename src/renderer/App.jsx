@@ -3,8 +3,17 @@ import { useMutation } from "@tanstack/react-query";
 import AddProjectForm from "./AddProjectForm";
 import BuildOutput from "./BuildOutput";
 import ProjectActions from "./ProjectActions";
+import { useEffect, useState } from "react";
 
 export default function App() {
+  const [activeProject, setActiveProject] = useState(null);
+  useEffect(() => {
+    window.api?.onData((data) => {
+      console.log("Received props:", data, data.project);
+      setActiveProject(data.project);
+      // Set in state or handle accordingly
+    });
+  }, []);
   const {
     mutate: createBuild,
     isPending: isBuilding,
@@ -31,6 +40,7 @@ export default function App() {
           path="/"
           element={
             <ProjectActions
+              activeProject={activeProject}
               createBuild={createBuild}
               isBuilding={isBuilding}
               variables={variables}

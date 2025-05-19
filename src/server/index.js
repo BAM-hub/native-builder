@@ -1,19 +1,20 @@
 import { exec, spawn } from "child_process";
-import { app, dialog } from "electron";
+import { app, BrowserWindow, dialog } from "electron";
 import express from "express";
 import fs from "fs";
 import path from "path";
 import { createReadStream } from "tail-file-stream";
+const net = require("net");
 
 const META_PATH = path.join(app.getPath("userData"), "meta.json");
 
 console.log(META_PATH);
 
 const BASE_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, "app", ".vite", "build", "bin")
+  ? path.join(process.resourcesPath, "app", ".vite", "build")
   : __dirname;
 
-const exePath = path.join(BASE_PATH, "native-builder.exe");
+const exePath = path.join(BASE_PATH, "bin", "native-builder.exe");
 const scriptPath = path.join(BASE_PATH, "bin", "movebuild.bat");
 
 function getMeta() {
@@ -50,7 +51,6 @@ function getJavaInfo(callback) {
 }
 
 function stdListner(id, childProcess, onClose) {
-  // childProcess.stdout.pipe(process.stdout);
   childProcess.stdout.on("data", (data) => {
     console.log(`stdout: ${data}`);
     if (typeof listner === "function") listner(data, false);
@@ -91,6 +91,93 @@ export function createServer() {
     next();
   });
 
+  function watchProjects() {
+    const meta = getMeta();
+    let miniWindow = null;
+    let isPenging = false;
+    let currentProject = null;
+
+    function ping() {
+      if (isPenging) return;
+      isPenging = true;
+      try {
+        const socket = net.Socket();
+        socket.once("connect", () => {
+          console.log("app now connected === the build is done !!!!!!");
+          if (miniWindow) return;
+          miniWindow = new BrowserWindow({
+            width: 800,
+            height: 300,
+            resizable: false,
+            maximizable: false,
+            alwaysOnTop: true,
+            webPreferences: {
+              devTools: !app.isPackaged,
+              preload: path.join(__dirname, "preload.js"),
+            },
+          });
+
+          miniWindow.webContents.once("did-finish-load", () => {
+            miniWindow.webContents.send("custom-data", {
+              project: currentProject,
+            });
+          });
+
+          if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+            miniWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+          } else {
+            miniWindow.loadFile(
+              path.join(
+                __dirname,
+                `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`
+              )
+            );
+          }
+          miniWindow.on("closed", () => {
+            miniWindow = null;
+          });
+
+          socket.destroy();
+          isPenging = false;
+        });
+        socket.once("error", (err) => {
+          // Suppress expected connection errors
+          // console.log(`Port ${port} not open yet: ${err.message}`);
+
+          setTimeout(() => {
+            socket.destroy();
+            isPenging = false;
+            ping();
+          }, 5000);
+        });
+        socket.connect(8080, "localhost");
+      } catch (err) {
+        console.log(err);
+      }
+    }
+
+    meta.forEach(({ project }) => {
+      try {
+        fs.watch(
+          path.join(project, "deployment", "native"),
+          {},
+          (event, filename) => {
+            if (!childProcess) {
+              currentProject = project;
+              console.log("will start pinging !!!!!!!!!!", filename);
+              ping();
+            }
+          }
+        );
+
+        console.log("watching ", project);
+      } catch {
+        console.error("watching project failed " + project);
+      }
+    });
+  }
+  watchProjects();
+
   function clearTempFile() {
     if (tempId)
       fs.unlink(BASE_PATH + `${tempId}.txt`, (err) => {
@@ -104,9 +191,9 @@ export function createServer() {
   api.get("/api/pick", async (req, res) => {
     const result = await dialog.showOpenDialog({
       title: "Pick a file",
-      properties: ["openDirectory"],
+      properties: ["openFile"],
+      filters: [{ name: "All Files", extensions: ["*"] }],
     });
-
     if (result.canceled || result.filePaths.length === 0) {
       return res.status(400).json({ error: "No file selected" });
     }
@@ -206,7 +293,7 @@ export function createServer() {
       "--output-path",
       `"${nativeTemplate}"`,
       "--project-path",
-      `"${project}\\Tajawob.mpr"`,
+      `"${project}"`,
       "--java-home",
       `"${java}"`,
       "--mxbuild-path",
@@ -220,7 +307,7 @@ export function createServer() {
 
       stdListner(tempId, childProcess, (code) => {
         if (code !== 0) {
-          clearTempFile();
+          // clearTempFile();
           return res.send({ message: "somthing went wrong", code, exePath });
         }
         console.warn(`child process exited with code ${code}`);
@@ -274,14 +361,39 @@ export function createServer() {
     });
   });
 
-  api.get("/api/build-stream", (req, res) => {
+  api.get("/api/build-stream", async (req, res) => {
+    const fileExists = await new Promise((resolve, reject) => {
+      try {
+        let tries = 0;
+        function getFileExists() {
+          let exists = fs.existsSync(BASE_PATH + `${tempId}.txt`);
+          if (exists || tries > 3) {
+            return resolve(exists);
+          }
+          tries += 1;
+          setTimeout(() => {
+            getFileExists();
+          }, 1000);
+        }
+        getFileExists();
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    if (!fileExists) {
+      return res.status(500).send({
+        message: "somthing went wring in file stream",
+      });
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-
     const readableStream = createReadStream(BASE_PATH + `${tempId}.txt`, {
       start: 0,
     });
+
     readableStream.on("data", (data) => {
       data
         ?.toString()

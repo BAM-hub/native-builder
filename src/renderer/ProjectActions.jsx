@@ -2,15 +2,25 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 
-export default function ProjectActions({ createBuild, isBuilding, variables }) {
+export default function ProjectActions({
+  createBuild,
+  isBuilding,
+  variables,
+  activeProject,
+}) {
   const abortController = useRef(new AbortController());
   const navigate = useNavigate();
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["projects"],
+    queryKey: ["projects", activeProject],
     queryFn: async () => {
       const res = await fetch("http://localhost:3000/api/projects");
       const data = await res.json();
-      return data.data;
+      console.log(activeProject, data);
+      if (!activeProject) return data.data;
+      return data.data.filter(
+        (data) =>
+          data.project.split("\\").at(-1) === activeProject.split("\\").at(-1)
+      );
     },
   });
 
