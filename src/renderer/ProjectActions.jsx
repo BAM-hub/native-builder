@@ -17,10 +17,7 @@ export default function ProjectActions({
       const data = await res.json();
       console.log(activeProject, data);
       if (!activeProject) return data.data;
-      return data.data.filter(
-        (data) =>
-          data.project.split("\\").at(-1) === activeProject.split("\\").at(-1)
-      );
+      return data.data.filter((data) => data.id === activeProject);
     },
   });
 

@@ -119,7 +119,7 @@ export function createServer() {
 
           miniWindow.webContents.once("did-finish-load", () => {
             miniWindow.webContents.send("custom-data", {
-              project: currentProject,
+              id: currentProject,
             });
           });
 
@@ -156,23 +156,27 @@ export function createServer() {
       }
     }
 
-    meta.forEach(({ project }) => {
+    meta.forEach(({ project, id }) => {
+      const projectPath = project
+        .split("\\")
+        .filter((str) => !str.includes(".mpr"));
       try {
         fs.watch(
-          path.join(project, "deployment", "native"),
+          path.join(projectPath, "deployment", "native"),
           {},
           (event, filename) => {
             if (!childProcess) {
-              currentProject = project;
+              currentProject = id;
               console.log("will start pinging !!!!!!!!!!", filename);
+              // Todo ping is useless now please remove later
               ping();
             }
           }
         );
 
-        console.log("watching ", project);
+        console.log("watching ", projectPath);
       } catch {
-        console.error("watching project failed " + project);
+        console.error("watching project failed " + projectPath);
       }
     });
   }

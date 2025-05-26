@@ -9,8 +9,8 @@ export default function App() {
   const [activeProject, setActiveProject] = useState(null);
   useEffect(() => {
     window.api?.onData((data) => {
-      console.log("Received props:", data, data.project);
-      setActiveProject(data.project);
+      console.log("Received props:", data);
+      setActiveProject(data.id);
       // Set in state or handle accordingly
     });
   }, []);
